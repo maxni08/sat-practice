@@ -13,4 +13,4 @@ node scripts/desktop.mjs build --target aarch64-apple-darwin --bundles app,dmg
 
 The native results are `src-tauri/target/aarch64-apple-darwin/release/bundle/macos/SAT Practice.app` and `src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/SAT Practice_1.4.3_aarch64.dmg` (Tauri may add the macOS version to the DMG filename). Check the exact name in that directory.
 
-For private unsigned installation, macOS Gatekeeper may require opening the app through Finder's **Open** context-menu action and confirming in **System Settings → Privacy & Security**. No Apple developer signature or notarization is configured.
+The Apple Silicon bundle is ad-hoc signed. It is not Developer ID signed or notarized, so macOS Gatekeeper may still require opening it through Finder's **Open** context-menu action and confirming in **System Settings → Privacy & Security**. The build checks the complete app signature and disk-image integrity before publishing.

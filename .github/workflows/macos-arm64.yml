@@ -41,6 +41,12 @@ jobs:
           test "$(find "$dmg_dir" -maxdepth 1 -name '*.dmg' -type f | wc -l | tr -d ' ')" = 1
           test "$(lipo -archs "$app/Contents/MacOS/sat-practice")" = arm64
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = com.local.satpractice
+          codesign --verify --deep --strict --verbose=2 "$app"
+          hdiutil verify "$dmg_dir"/*.dmg
+          mkdir -p /tmp/sat-practice-release-check
+          hdiutil attach -readonly -nobrowse -mountpoint /tmp/sat-practice-release-check "$dmg_dir"/*.dmg
+          codesign --verify --deep --strict --verbose=2 '/tmp/sat-practice-release-check/SAT Practice.app'
+          hdiutil detach /tmp/sat-practice-release-check
           mkdir -p macos-artifacts
           tar -czf macos-artifacts/SAT-Practice-1.4.3-aarch64.app.tar.gz -C "$(dirname "$app")" "$(basename "$app")"
           cp "$dmg_dir"/*.dmg macos-artifacts/
