@@ -15,7 +15,7 @@ jobs:
       - name: Download verified macOS build
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download 36041435320 --repo "$GITHUB_REPOSITORY" --name SAT-Practice-1.4.3-macOS-ARM64 --dir macos-artifacts
+        run: gh run download 36060658667 --repo "$GITHUB_REPOSITORY" --name SAT-Practice-1.4.3-macOS-ARM64 --dir macos-artifacts
       - name: Verify installer checksum
         run: |
           shasum -a 256 -c macos-artifacts/SHA256SUMS.txt
