@@ -1,0 +1,29 @@
+name: Publish Apple Silicon installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified macOS build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 36041435320 --repo "$GITHUB_REPOSITORY" --name SAT-Practice-1.4.3-macOS-ARM64 --dir macos-artifacts
+      - name: Verify installer checksum
+        run: |
+          shasum -a 256 -c macos-artifacts/SHA256SUMS.txt
+          test -f 'macos-artifacts/SAT Practice_1.4.3_aarch64.dmg'
+      - name: Publish DMG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='v1.4.3-macos-arm64'
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target main --title 'SAT Practice 1.4.3 — Apple Silicon' --notes 'Native ARM64 macOS installer. Unsigned and not notarized.'
+          gh release upload "$tag" 'macos-artifacts/SAT Practice_1.4.3_aarch64.dmg' --repo "$GITHUB_REPOSITORY" --clobber
