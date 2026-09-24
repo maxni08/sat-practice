@@ -1,0 +1,36 @@
+name: Diagnose Apple Silicon installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: macos-15
+    steps:
+      - name: Download exact released build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 36041435320 --repo "$GITHUB_REPOSITORY" --name SAT-Practice-1.4.3-macOS-ARM64 --dir macos-artifacts
+      - name: Check disk image and app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          shasum -a 256 -c macos-artifacts/SHA256SUMS.txt
+          dmg='macos-artifacts/SAT Practice_1.4.3_aarch64.dmg'
+          hdiutil verify "$dmg"
+          mkdir -p /tmp/sat-practice-mount
+          hdiutil attach -readonly -nobrowse -mountpoint /tmp/sat-practice-mount "$dmg"
+          app='/tmp/sat-practice-mount/SAT Practice.app'
+          test -d "$app"
+          file "$app/Contents/MacOS/sat-practice"
+          echo '--- signature details ---'
+          codesign -dv --verbose=4 "$app" 2>&1 || true
+          echo '--- signature verification ---'
+          codesign --verify --deep --strict --verbose=3 "$app" 2>&1 || true
+          echo '--- Gatekeeper assessment ---'
+          spctl --assess --verbose=4 --type execute "$app" 2>&1 || true
+          hdiutil detach /tmp/sat-practice-mount
