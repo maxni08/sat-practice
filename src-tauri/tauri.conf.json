@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SAT Practice",
+  "version": "1.4.3",
+  "identifier": "com.local.satpractice",
+  "mainBinaryName": "sat-practice",
+  "build": {
+    "beforeDevCommand": "node scripts/frontend.mjs dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "node scripts/frontend.mjs build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{
+      "label": "main",
+      "title": "SAT Practice",
+      "width": 1280,
+      "height": 800,
+      "minWidth": 800,
+      "minHeight": 400,
+      "resizable": true,
+      "center": true,
+      "backgroundColor": "#FFFFFF"
+    }],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost 'self'; object-src 'none'; base-uri 'self'; frame-src 'none'",
+      "devCsp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost 'self' ws://localhost:1420 ws://127.0.0.1:1420; object-src 'none'; base-uri 'self'; frame-src 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "shortDescription": "Private local SAT question practice",
+    "longDescription": "A focused offline question bank with local progress, timing, review, and a Desmos calculator window.",
+    "category": "Education",
+    "icon": ["icons/icon.ico", "icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png"],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "allowDowngrades": false,
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "languages": ["English"],
+        "startMenuFolder": "SAT Practice"
+      },
+      "wix": { "language": "en-US" }
+    }
+  }
+}
+

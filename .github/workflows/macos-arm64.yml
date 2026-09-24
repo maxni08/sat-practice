@@ -1,0 +1,53 @@
+name: macOS Apple Silicon package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "15.0"
+      CARGO_BUILD_JOBS: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - name: Confirm native Apple Silicon runner and bank
+        run: |
+          test "$(uname -m)" = arm64
+          node -e 'if (require("./public/bank/questions.json").length !== 3770) process.exit(1)'
+      - run: pnpm install --frozen-lockfile
+      - name: Build only ARM64 app and DMG
+        run: node scripts/desktop.mjs build --target aarch64-apple-darwin --bundles app,dmg
+      - name: Check native bundles and pack app
+        run: |
+          set -e
+          app='src-tauri/target/aarch64-apple-darwin/release/bundle/macos/SAT Practice.app'
+          dmg_dir='src-tauri/target/aarch64-apple-darwin/release/bundle/dmg'
+          test -d "$app"
+          test "$(find "$dmg_dir" -maxdepth 1 -name '*.dmg' -type f | wc -l | tr -d ' ')" = 1
+          test "$(lipo -archs "$app/Contents/MacOS/sat-practice")" = arm64
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = com.local.satpractice
+          mkdir -p macos-artifacts
+          tar -czf macos-artifacts/SAT-Practice-1.4.3-aarch64.app.tar.gz -C "$(dirname "$app")" "$(basename "$app")"
+          cp "$dmg_dir"/*.dmg macos-artifacts/
+          shasum -a 256 macos-artifacts/* > macos-artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SAT-Practice-1.4.3-macOS-ARM64
+          path: macos-artifacts/
+          if-no-files-found: error
+          retention-days: 7

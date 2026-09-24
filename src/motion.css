@@ -1,0 +1,76 @@
+/* Presentation only: no session, clock, scoring or persistence callbacks. */
+button {
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease,
+    transform 0.1s ease;
+}
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.page,
+.modal[open],
+.recommendations,
+.module-details,
+.mastery-lists section {
+  animation: quiet-enter 0.18s ease-out;
+}
+.modal::backdrop {
+  animation: quiet-appear 0.14s ease-out;
+}
+.choice,
+.choice-row {
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    opacity 0.14s ease;
+}
+.navigator button {
+  transition:
+    background-color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+.level-summary progress::-webkit-progress-value {
+  transition: width 0.45s ease;
+}
+.level-summary strong,
+.level-summary .xp-value,
+.mastery-value {
+  animation: quiet-appear 0.25s ease-out;
+}
+.trophy-toast {
+  animation: quiet-enter 0.2s ease-out;
+}
+@keyframes quiet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes quiet-appear {
+  from {
+    opacity: 0.3;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  button:active:not(:disabled) {
+    transform: none;
+  }
+}
+.question-number{animation:quiet-appear .14s ease-out}.question-list button{transition:background-color .14s ease,border-color .14s ease}

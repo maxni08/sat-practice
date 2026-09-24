@@ -1,0 +1,239 @@
+.level-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 0;
+  border-bottom: 1px solid #dce0e8;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+.level-summary progress {
+  width: 150px;
+  height: 7px;
+  accent-color: #344bc7;
+}
+.level-summary small {
+  color: #65718a;
+}
+.study-modes {
+  display: flex;
+  gap: 12px;
+  margin: 22px 0;
+  flex-wrap: wrap;
+}
+.study-modes button {
+  flex: 1;
+  min-width: 160px;
+  text-align: left;
+  padding: 16px;
+  border: 1px solid #b8c2d4;
+  background: #f8faff;
+}
+.study-modes strong,
+.study-modes small {
+  display: block;
+}
+.study-modes small {
+  margin-top: 5px;
+  color: #65718a;
+  font-size: 12px;
+}
+.recommendations {
+  margin: 25px 0;
+}
+.recommendations h2 {
+  font-size: 18px;
+}
+.recommendations > button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  gap: 20px;
+  width: 100%;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid #dce0e8;
+  background: white;
+  border-radius: 0;
+}
+.recommendations small {
+  display: block;
+  margin-top: 5px;
+  color: #65718a;
+}
+.study-overview {
+  margin: 20px 0 35px;
+}
+.mastery-lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 40px;
+}
+.mastery-lists h2 {
+  font-size: 17px;
+}
+.mastery-lists ul {
+  list-style: none;
+  padding: 0;
+}
+.mastery-lists li {
+  display: flex;
+  gap: 15px;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #e1e5ed;
+}
+.mastery-lists small {
+  display: block;
+  font-size: 11px;
+  color: #65718a;
+  margin-top: 4px;
+}
+.achievement-list > section,
+.module-history > section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 22px;
+  padding: 20px 0;
+  border-bottom: 1px solid #dce0e8;
+}
+.achievement-list h2,
+.module-history h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.achievement-list p,
+.module-history p {
+  font-size: 14px;
+  margin: 6px 0;
+}
+.achievement-list small,
+.module-history small {
+  color: #65718a;
+}
+.achievement-list progress {
+  width: 130px;
+  flex-shrink: 0;
+  height: 7px;
+  accent-color: #8590a8;
+}
+.achievement-list .unlocked progress {
+  accent-color: #344bc7;
+}
+.achievement-list .unlocked h2 {
+  color: #2443a7;
+}
+.module-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  margin: 30px 0;
+}
+.module-options section {
+  padding: 22px;
+  border: 1px solid #c9d0de;
+}
+.module-options small {
+  display: block;
+  margin-top: 20px;
+  color: #65718a;
+}
+.study-setup {
+  max-width: 850px;
+}
+.study-setup .field-label {
+  max-width: 400px;
+  margin: 24px 0;
+}
+.study-setup select,
+.study-setup input {
+  padding: 10px;
+  border: 1px solid #aeb8ca;
+  border-radius: 3px;
+}
+.achievement-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 90px;
+  max-width: 290px;
+  padding: 12px 15px;
+  background: #eef3ff;
+  border: 1px solid #b4c4e6;
+  z-index: 5;
+  box-shadow: 0 2px 8px #0001;
+  font-size: 13px;
+}
+.achievement-toast button {
+  margin-left: 10px;
+  border: 0;
+  background: transparent;
+}
+.module-response-status {
+  font-size: 14px;
+  color: #596780;
+  margin-top: 20px;
+}
+.module-details {
+  margin-top: 28px;
+}
+.module-details table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.module-details th,
+.module-details td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid #dce0e8;
+}
+.module-details button {
+  border: 0;
+  background: transparent;
+  color: #344bc7;
+  padding: 0;
+}
+.module-details .marked {
+  font-weight: 600;
+}
+.module-results-actions {
+  margin-top: 20px;
+}
+@media (max-width: 850px) {
+  .module-options,
+  .mastery-lists {
+    grid-template-columns: 1fr;
+  }
+  .module-history > section {
+    align-items: start;
+    flex-direction: column;
+  }
+  .achievement-list > section {
+    gap: 12px;
+  }
+  .achievement-list progress {
+    width: 80px;
+  }
+  .level-summary {
+    gap: 10px;
+  }
+  .level-summary progress {
+    width: 100px;
+  }
+  .achievement-toast {
+    bottom: 72px;
+    right: 10px;
+    max-width: 235px;
+  }
+  .module-details th,
+  .module-details td {
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+}
+.challenge-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 20px; }
+.challenge-list article { border: 1px solid #d8dde5; padding: 20px; }
+.challenge-list h2 { font-size: 1.1rem; }
+.extra-results { border-bottom: 1px solid #d8dde5; padding-bottom: 24px; }

@@ -1,0 +1,40 @@
+{
+  "generatedAt": "2026-09-08T13:19:15.516778+00:00",
+  "importerVersion": "1.0.0",
+  "sources": [
+    {
+      "file": "math-question-bank.pdf",
+      "sha256": "cb7f299a9701904f9f1113fe0f90c9d9f1050f915bf0fa8d1474da9790faaeb0",
+      "pages": 2030,
+      "questionStarts": 1925,
+      "imported": 1925
+    },
+    {
+      "file": "reading-writing-question-bank.pdf",
+      "sha256": "9ba0c1f472caeaa8b7f12e30190e18f1d5858f2158dc578d05c8f9b3dbbccc80",
+      "pages": 1977,
+      "questionStarts": 1845,
+      "imported": 1845
+    }
+  ],
+  "totalQuestions": 3770,
+  "countsByTest": {
+    "Math": 1925,
+    "Reading and Writing": 1845
+  },
+  "countsByType": {
+    "numeric": 464,
+    "multiple-choice": 3306
+  },
+  "countsByDifficulty": {
+    "Hard": 1220,
+    "Easy": 1296,
+    "Medium": 1254
+  },
+  "renderedMathQuestions": 1925,
+  "readingWithVisuals": 133,
+  "warnings": 22,
+  "quarantined": 0,
+  "errors": 0,
+  "fidelity": "All question bodies and rationales have faithful lossless PDF image assets. Math choices also have image assets. Text extraction does not reconstruct PDF-only equation paths. Reading text is Unicode and selectable. Original-format views preserve formatting and emphasis."
+}
