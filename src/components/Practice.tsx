@@ -1,5 +1,6 @@
 import { STAGES } from "../progression/campaign";
 import { useEffect, useState } from "react";
+import { useEscape } from "../lib/escape";
 import {
   Bookmark,
   Calculator,
@@ -61,6 +62,7 @@ export function Practice({
   const [panel, setPanel] = useState<
     "notes" | "navigator" | "reference" | "finish" | "reset" | null
   >(null);
+  useEscape(panel !== null, () => setPanel(null), 20);
   const [highlight, setHighlight] = useState(false);
   const [original, setOriginal] = useState(false);
   const [originalRationale, setOriginalRationale] = useState(false);

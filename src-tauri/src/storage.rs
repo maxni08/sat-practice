@@ -49,7 +49,7 @@ impl Store {
             .busy_timeout(Duration::from_secs(5))
             .map_err(|e| e.to_string())?;
         let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0)).map_err(|e| e.to_string())?;
-        if version > 4 { return Err("This database belongs to a newer SAT Practice version. Use that version to preserve your progress.".into()); }
+        if version > 5 { return Err("This database belongs to a newer SAT Practice version. Use that version to preserve your progress.".into()); }
         if version == 1 {
             let backup = path.with_file_name("progress-before-v2.sqlite3");
             if !backup.exists() {
@@ -69,6 +69,13 @@ impl Store {
             if !backup.exists() {
                 connection.execute("VACUUM INTO ?1", [backup.to_string_lossy().as_ref()])
                     .map_err(|e| format!("Cannot back up existing progress before Local 1v1 migration: {e}"))?;
+            }
+        }
+        if version == 4 {
+            let backup = path.with_file_name("progress-before-v5.sqlite3");
+            if !backup.exists() {
+                connection.execute("VACUUM INTO ?1", [backup.to_string_lossy().as_ref()])
+                    .map_err(|e| format!("Cannot back up existing progress before question-library migration: {e}"))?;
             }
         }
         connection
@@ -98,6 +105,10 @@ impl Store {
         if version < 4 {
             connection.execute_batch(include_str!("migrations/004_duel.sql"))
                 .map_err(|e| format!("Cannot migrate Local 1v1 history; the original progress is preserved: {e}"))?;
+        }
+        if version < 5 {
+            connection.execute_batch(include_str!("migrations/005_library.sql"))
+                .map_err(|e| format!("Cannot migrate question library; the original progress is preserved: {e}"))?;
         }
         Ok(Self { connection })
     }
@@ -452,7 +463,7 @@ mod tests {
         assert_eq!(backup.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),1);
         assert_eq!(backup.query_row("SELECT progress_json FROM question_progress",[],|r|r.get::<_,String>(0)).unwrap(),old_json);
         drop(store);
-        assert_eq!(Store::open(&path).unwrap().connection.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),4);
+        assert_eq!(Store::open(&path).unwrap().connection.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),5);
     }
 
     #[test]
@@ -543,7 +554,7 @@ mod tests {
         assert_eq!(store.load_playtime().unwrap(),Some(value));
         assert_eq!(store.load().unwrap().progress.len(),1);
         assert!(directory.path().join("progress-before-v3.sqlite3").exists());
-        assert_eq!(store.connection.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),4);
+        assert_eq!(store.connection.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),5);
     }
 
     #[test]
@@ -565,7 +576,26 @@ mod tests {
         assert_eq!(store.load_duel_history().unwrap(),Some(value));
         assert_eq!(store.load().unwrap().progress["real"].notes,progress().notes);
         assert!(directory.path().join("progress-before-v4.sqlite3").exists());
-        assert_eq!(store.connection.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),4);
+        assert_eq!(store.connection.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),5);
+    }
+
+    #[test]
+    fn library_migration_preserves_v4_study_and_attempts() {
+        let directory=tempfile::tempdir().unwrap();let path=directory.path().join("existing v4.sqlite3");
+        let expected=study(1,299);
+        {
+            let mut store=Store::open(&path).unwrap();
+            store.save_progress("real-question",&progress()).unwrap();
+            store.commit_study("existing-study",0,&expected,&HashMap::new(),None,&[]).unwrap();
+            store.connection.execute_batch("DROP TABLE library_questions; DROP TABLE question_sources; PRAGMA user_version=4;").unwrap();
+        }
+        let reopened=Store::open(&path).unwrap();
+        assert_eq!(reopened.load().unwrap().progress["real-question"].notes,progress().notes);
+        assert_eq!(reopened.load_study().unwrap(),Some(expected));
+        assert_eq!(reopened.connection.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),5);
+        assert!(directory.path().join("progress-before-v5.sqlite3").exists());
+        let backup=Connection::open(directory.path().join("progress-before-v5.sqlite3")).unwrap();
+        assert_eq!(backup.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0)).unwrap(),4);
     }
 
     #[test]

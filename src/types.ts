@@ -11,6 +11,10 @@ export interface Choice {
 export interface Question {
   id: string;
   questionId: string;
+  sourceId?: string;
+  sourceName?: string;
+  sourceVersion?: string;
+  externalQuestionId?: string;
   test: TestSection;
   domain: string;
   skill: string;
@@ -63,6 +67,7 @@ export type HistoryFilter =
 
 export interface SessionFilters {
   test: TestSection;
+  sourceIds?: string[];
   domains: string[];
   skills: string[];
   difficulties: Difficulty[];

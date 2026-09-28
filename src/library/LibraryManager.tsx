@@ -1,0 +1,54 @@
+import { useMemo, useState } from "react";
+import type { Question } from "../types";
+import { chooseAndImport, deactivatePersonal, openPacksFolder, removeSource, savePersonal, savePersonalImage, setSourceEnabled, sourceId, type ImportReport, type QuestionSource } from "./library";
+import "./library.css";
+
+type Props = { questions: Question[]; sources: QuestionSource[]; onRefresh: () => Promise<void>; onView: (question: Question) => void; onBack: () => void };
+const blank = () => ({ test: "Math" as Question["test"], domain: "", skill: "", difficulty: "Medium" as Question["difficulty"], questionType: "multiple-choice" as Question["questionType"], passage: "", stem: "", choices: ["A","B","C","D"].map(label => ({ label, text: "" })), correctAnswer: "A", acceptedAnswers: [] as string[], rationale: "", assets: [] as string[] });
+type Draft = ReturnType<typeof blank>;
+const personalAsset = (value: string) => value.replace(/^satasset:\/\/personal\/personal\//, "");
+
+export function LibraryManager({ questions, sources, onRefresh, onView, onBack }: Props) {
+  const [selected, setSelected] = useState("builtin");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [priorId, setPriorId] = useState<string>();
+  const [working, setWorking] = useState(false);
+  const [message, setMessage] = useState("");
+  const [report, setReport] = useState<ImportReport | null>(null);
+  const source = sources.find(item => item.id === selected);
+  const visible = useMemo(() => questions.filter(q => sourceId(q) === selected && (!query || `${q.questionId} ${q.stem} ${q.skill}`.toLowerCase().includes(query.toLowerCase()))), [questions, selected, query]);
+  const pageItems = visible.slice(page * 25, page * 25 + 25);
+  async function run(task: () => Promise<unknown>) { setWorking(true); setMessage(""); try { await task(); await onRefresh(); } catch (error) { setMessage(String(error)); } finally { setWorking(false); } }
+  function edit(question: Question, copy = false) {
+    setPriorId(copy ? undefined : question.id);
+    setDraft({ test: question.test, domain: question.domain, skill: question.skill, difficulty: question.difficulty, questionType: question.questionType, passage: question.passage, stem: question.stem, choices: question.choices.map(c => ({ label: c.label, text: c.text })), correctAnswer: question.correctAnswer, acceptedAnswers: [...question.acceptedAnswers], rationale: question.rationale, assets: question.assets.map(personalAsset) });
+  }
+  async function addImage(file?: File) {
+    if (!file || !draft) return;
+    if (file.size > 8_000_000) { setMessage("Images must be under 8 MB."); return; }
+    const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); });
+    await run(async () => { const path = await savePersonalImage(dataUrl); setDraft(old => old ? { ...old, assets: [...old.assets, path] } : old); });
+  }
+  return <main className="page library-page">
+    <button className="text-button back" onClick={() => { if (!draft || window.confirm("Discard unsaved question changes?")) onBack(); }}>← Home</button>
+    <p className="eyebrow">QUESTION LIBRARY</p><h1>Question Sources</h1><p className="lead">The built-in bank stays available. Add portable packs or write your own questions.</p>
+    <div className="button-row"><button className="primary" disabled={working} onClick={() => run(async () => { const result = await chooseAndImport(); if (result) { setReport(result); setSelected(result.sourceId); } })}>Import Pack / JSON / CSV</button><button onClick={() => run(openPacksFolder)}>Open Question Packs Folder</button><button onClick={() => { setSelected("personal"); setPriorId(undefined); setDraft(blank()); }}>Add Question</button></div>
+    {message && <p className="library-error" role="alert">{message}</p>}
+    {report && <section className="library-report" aria-live="polite"><strong>Import report · {report.sourceId}</strong><p>{report.valid} valid · {report.skipped} skipped · {report.duplicates} duplicates · {report.invalid} invalid · {report.missingAssets} missing assets · {report.unsupported} unsupported</p>{report.issues.length > 0 && <details><summary>Questions to inspect</summary><ul>{report.issues.map((issue, i) => <li key={i}>{issue}</li>)}</ul></details>}</section>}
+    <div className="library-grid"><nav className="library-sources" aria-label="Question sources">{sources.map(item => <button key={item.id} className={selected === item.id ? "selected" : ""} onClick={() => { setSelected(item.id); setPage(0); setQuery(""); setDraft(null); }}><strong>{item.name}</strong><span>{item.count.toLocaleString()} questions · {item.sourceType} · {item.status}</span>{item.sourceType === "pack" && <small>v{item.version}</small>}</button>)}</nav>
+      <section className="library-detail">{source && <><div className="library-detail-head"><div><h2>{source.name}</h2><p>{source.count.toLocaleString()} questions · {source.status}{source.id !== "builtin" ? ` · v${source.version}` : ""}</p></div>{source.id !== "builtin" && source.id !== "personal" && <div className="button-row"><button disabled={working || source.sourceType === "invalid"} onClick={() => run(() => setSourceEnabled(source.id, !source.enabled))}>{source.enabled ? "Disable" : "Enable"}</button><button disabled={working || !source.present} onClick={() => { if (window.confirm(`Remove ${source.name} from the active library? Study history stays saved.`)) void run(() => removeSource(source.id)); }}>Remove</button></div>}</div>
+      {source.report && "issues" in source.report && Array.isArray(source.report.issues) && source.report.issues.length > 0 && <details><summary>Last import notes</summary><ul>{source.report.issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}</ul></details>}
+      <label className="field-label">Find within this source<input value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="ID, question text, or skill" /></label>
+      <div className="library-rows">{pageItems.map(q => <article key={q.id}><button className="text-button" onClick={() => onView(q)}><strong>{q.questionId}</strong><span>{q.test} · {q.domain} · {q.skill} · {q.difficulty}</span></button>{source.id === "personal" && <div className="button-row"><button onClick={() => edit(q)}>Edit</button><button onClick={() => edit(q, true)}>Duplicate</button><button onClick={() => { if (window.confirm("Remove this question from practice? Its history will be kept.")) void run(() => deactivatePersonal(q.id)); }}>Deactivate</button></div>}</article>)}</div>
+      {!pageItems.length && <p className="muted">{source.enabled ? "No active questions match." : "Enable this source to browse its questions."}</p>}
+      {visible.length > 25 && <div className="button-row"><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><span>Page {page + 1} of {Math.ceil(visible.length / 25)}</span><button disabled={(page + 1) * 25 >= visible.length} onClick={() => setPage(page + 1)}>Next</button></div>}</>}</section></div>
+    {draft && <section className="library-form"><h2>{priorId ? "Edit personal question" : "Add personal question"}</h2><div className="library-form-grid"><label>Subject<select value={draft.test} onChange={e => setDraft({ ...draft, test: e.target.value as Question["test"], questionType: e.target.value === "Math" ? draft.questionType : "multiple-choice" })}><option>Math</option><option>Reading and Writing</option></select></label><label>Difficulty<select value={draft.difficulty} onChange={e => setDraft({ ...draft, difficulty: e.target.value as Question["difficulty"] })}><option>Easy</option><option>Medium</option><option>Hard</option></select></label><label>Domain<input value={draft.domain} list="library-domains" onChange={e => setDraft({ ...draft, domain: e.target.value })} /><datalist id="library-domains">{[...new Set(questions.filter(q => q.test === draft.test).map(q => q.domain))].map(value => <option key={value} value={value} />)}</datalist></label><label>Skill<input value={draft.skill} list="library-skills" onChange={e => setDraft({ ...draft, skill: e.target.value })} /><datalist id="library-skills">{[...new Set(questions.filter(q => q.test === draft.test && (!draft.domain || q.domain === draft.domain)).map(q => q.skill))].map(value => <option key={value} value={value} />)}</datalist></label><label>Question type<select value={draft.questionType} onChange={e => setDraft({ ...draft, questionType: e.target.value as Question["questionType"] })}><option value="multiple-choice">Multiple choice</option>{draft.test === "Math" && <option value="numeric">Numeric response</option>}</select></label></div>
+      <label>Passage / context<textarea value={draft.passage} onChange={e => setDraft({ ...draft, passage: e.target.value })} /></label><label>Question text<textarea required value={draft.stem} onChange={e => setDraft({ ...draft, stem: e.target.value })} /></label>
+      {draft.questionType === "multiple-choice" ? <div className="library-choices">{draft.choices.map((choice, i) => <label key={choice.label}>{choice.label}<input value={choice.text} onChange={e => setDraft({ ...draft, choices: draft.choices.map((c, j) => j === i ? { ...c, text: e.target.value } : c) })} /></label>)}</div> : <label>Accepted answers, separated by |<input value={draft.acceptedAnswers.join("|")} onChange={e => setDraft({ ...draft, acceptedAnswers: e.target.value.split("|").map(s => s.trim()).filter(Boolean), correctAnswer: e.target.value.split("|")[0]?.trim() ?? "" })} /></label>}
+      {draft.questionType === "multiple-choice" && <label>Correct answer<select value={draft.correctAnswer} onChange={e => setDraft({ ...draft, correctAnswer: e.target.value })}>{["A","B","C","D"].map(label => <option key={label}>{label}</option>)}</select></label>}
+      <label>Explanation<textarea required value={draft.rationale} onChange={e => setDraft({ ...draft, rationale: e.target.value })} /></label><label>Optional image / diagram<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={e => void addImage(e.target.files?.[0])} /></label>{draft.assets.length > 0 && <p>{draft.assets.length} image{draft.assets.length === 1 ? "" : "s"} attached <button onClick={() => setDraft({ ...draft, assets: [] })}>Remove images</button></p>}
+      <div className="button-row"><button className="primary" disabled={working} onClick={() => run(async () => { await savePersonal(draft, priorId); setDraft(null); setPriorId(undefined); setSelected("personal"); })}>Save Question</button><button onClick={() => { if (window.confirm("Discard unsaved question changes?")) { setDraft(null); setPriorId(undefined); } }}>Cancel</button></div></section>}
+  </main>;
+}

@@ -28,7 +28,7 @@ export function sanitizeProductivity(raw: unknown, validIds?: Set<string>): Prod
   return { version: 1, queue, errors };
 }
 
-const searchable = (q: Question) => `${q.questionId} ${q.stem} ${q.passage} ${q.choices.map(c => c.text).join(" ")}`.toLowerCase();
+const searchable = (q: Question) => `${q.id} ${q.questionId} ${q.sourceName ?? "Built-in SAT Bank"} ${q.stem} ${q.passage} ${q.choices.map(c => c.text).join(" ")}`.toLowerCase();
 export function findQuestions(questions: Question[], query: string, limit = 50): Question[] {
   const term = query.trim().toLowerCase();
   if (!term) return [];
@@ -61,13 +61,14 @@ export function similarQuestions(source: Question, questions: Question[], progre
   }).sort((a, b) => b.score - a.score || a.q.questionId.localeCompare(b.q.questionId)).slice(0, count).map(row => row.q);
 }
 
-export interface BrowserFilters { query: string; test: "All" | TestSection; domain: string; skill: string; difficulty: "All" | Difficulty; history: "all" | "unseen" | "seen" | "correct" | "incorrect" | "bookmarked" }
+export interface BrowserFilters { query: string; test: "All" | TestSection; domain: string; skill: string; difficulty: "All" | Difficulty; history: "all" | "unseen" | "seen" | "correct" | "incorrect" | "bookmarked"; sourceId?: string }
 export function browseQuestions(questions: Question[], progress: ProgressMap, f: BrowserFilters): Question[] {
   const term = f.query.trim().toLowerCase();
   return questions.filter(q => {
     const p = progress[q.id];
     if (term && !searchable(q).includes(term)) return false;
     if (f.test !== "All" && q.test !== f.test) return false;
+    if (f.sourceId && (q.sourceId ?? "builtin") !== f.sourceId) return false;
     if (f.domain && q.domain !== f.domain) return false;
     if (f.skill && q.skill !== f.skill) return false;
     if (f.difficulty !== "All" && q.difficulty !== f.difficulty) return false;

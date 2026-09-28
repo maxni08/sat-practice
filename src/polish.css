@@ -1,0 +1,12 @@
+/* Shared 1.5 visual tokens. Presentation only; no study behavior. */
+:root{--card-radius:11px;--card-shadow:0 6px 22px rgba(18,39,76,.055);--divider:#dce3ed;--subtle-blue:#f4f7fd}
+.subject,.study-modes button,.tool-card,.library-detail,.library-report{border-radius:var(--card-radius);box-shadow:var(--card-shadow)}
+.subject:hover,.study-modes button:hover,.finder-results>button:hover{border-color:#8da3cb;box-shadow:0 10px 28px rgba(28,60,111,.1);transform:translateY(-2px)}
+.subject,.study-modes button,.finder-results>button{transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease,transform .16s ease}
+.study-modes button,.tool-card{border-color:var(--divider)}
+.tool-card{padding:24px}.finder-results>button{border-radius:8px}.finder-results>button:focus-visible{outline-offset:2px}
+.progress-link{background:var(--subtle-blue);padding:18px;border:1px solid var(--divider);border-radius:9px}.progress-link:hover{background:#edf3fc}
+.productivity-tabs button{border-radius:8px}.productivity-tabs button.selected{box-shadow:inset 0 -2px rgba(255,255,255,.35)}
+.modal{box-shadow:0 24px 70px rgba(19,40,79,.19)}.modal>header{background:#f7f9fd}
+progress{accent-color:var(--blue)}
+@media(prefers-reduced-motion:reduce){.subject,.study-modes button,.finder-results>button{transition:none}.subject:hover,.study-modes button:hover,.finder-results>button:hover{transform:none}}

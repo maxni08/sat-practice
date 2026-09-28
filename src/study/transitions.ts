@@ -8,6 +8,7 @@ import { completeMock } from './mock';
 import { completeChallenge } from './ladder';
 import { completeCampaign } from '../progression/campaign';
 import { progressionCompletion } from '../progression/engine';
+import { scheduleReview } from "./review";
 
 export function studySubmission(
   current: Session,
@@ -37,6 +38,22 @@ export function studySubmission(
       hardCorrect: prior.hardCorrect + Number(correct && q.difficulty === "Hard"),
       streak: correct ? prior.streak + 1 : 0,
       activeSeconds: prior.activeSeconds + result.session.answers[q.id].timeSpent,
+    };
+  }
+  // Imported and personal content is useful practice, but is not calibrated
+  // evidence for the fixed built-in bank's rank, XP and achievement rules.
+  // Keep its answer history and spaced review without changing those formulas.
+  if (q.sourceId && q.sourceId !== "builtin") {
+    const answer = result.session.answers[q.id];
+    answer.xpAwarded = 0;
+    answer.firstCredit = false;
+    const review = scheduleReview(study.reviews[q.id], answer.correct, now);
+    return {
+      study: { ...study, revision: study.revision + 1,
+        evidence: { ...study.evidence, [q.id]: [...(study.evidence[q.id] ?? []), { at: new Date(now).toISOString(), correct: answer.correct, seconds: answer.timeSpent, mode: current.mode ?? "custom" }].slice(-8) },
+        reviews: review ? { ...study.reviews, [q.id]: review } : study.reviews },
+      session: result.session, progress: nextProgress, updates: { [q.id]: result.progress },
+      eventId: `${current.id}:answer:${q.id}`,
     };
   }
   const award = rewardAttempt(
@@ -85,6 +102,11 @@ export function studyCompletion(
   now: number,
 ) {
   if (current.finished) throw new Error("This session is already complete.");
+  if (current.questionIds.some(id => !questions.some(q => q.id === id))) {
+    const completedSessions = { ...study.completedSessions, [current.id]: new Date(now).toISOString() };
+    return { study: { ...study, revision: study.revision + 1, completedSessions },
+      session: { ...current, finished: true }, progress, updates: {}, eventId: `${current.id}:complete` };
+  }
   let session = { ...current, finished: true },
     nextStudy = study,
     nextProgress = { ...progress },

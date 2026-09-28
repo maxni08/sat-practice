@@ -77,6 +77,10 @@ import { Duel, DuelSetup } from "./duel/DuelView";
 import { emptyDuelHistory, recordDuel, type DuelHistory, type DuelMatch } from "./duel/duel";
 import { ProductivityPanel } from "./productivity/ProductivityPanel";
 import { loadProductivity, saveProductivity, sanitizeProductivity, similarQuestions, type ErrorTag, type ProductivityState } from "./productivity/productivity";
+import { loadQuestionLibrary, scanQuestionPacks, mergeLibrary, type LibrarySnapshot } from "./library/library";
+import { LibraryManager } from "./library/LibraryManager";
+import "./library/library.css";
+import "./polish.css";
 
 type View =
   | "campaign"
@@ -93,9 +97,12 @@ type View =
   | "transition"
   | "duel-setup"
   | "productivity"
+  | "library"
   | "duel";
 export default function App() {
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [builtinQuestions, setBuiltinQuestions] = useState<Question[]>([]);
+  const [library, setLibrary] = useState<LibrarySnapshot>({sources:[],questions:[]});
   const [progress, setProgress] = useState<ProgressMap>({});
   const [session, setSession] = useState<Session | null>(null);
   const [view, setView] = useState<View>("home");
@@ -113,6 +120,7 @@ export default function App() {
   const [duelHistory, setDuelHistory] = useState<DuelHistory>(emptyDuelHistory);
   const [duel, setDuel] = useState<DuelMatch | null>(null);
   const [productivity, setProductivity] = useState<ProductivityState>(loadProductivity);
+  const [studyOpen, setStudyOpen] = useState<Question | null>(null);
   const currentPlaytimeRef = useRef(0);
   const [study, setStudy] = useState<StudyState | null>(null);
   const studyRef = useRef<StudyState | null>(null);
@@ -176,12 +184,16 @@ export default function App() {
       loadStudy(),
       loadPlaytime(),
       loadDuelHistory(),
+      loadQuestionLibrary(),
     ])
-      .then(async ([bank, state, path, learning, savedPlaytime, savedDuels]) => {
+      .then(async ([bank, state, path, learning, savedPlaytime, savedDuels, snapshot]) => {
         if (!active) return;
         if (!Array.isArray(bank) || !bank.length)
           throw Error("The question bank is empty.");
-        setQuestions(bank);
+        setBuiltinQuestions(bank);
+        setLibrary(snapshot);
+        const available = mergeLibrary(bank, snapshot);
+        setQuestions(available);
         setProgress(state.progress);
         let nextStudy =
           learning ?? initializeStudy(bank, state.progress, Date.now());
@@ -238,8 +250,8 @@ export default function App() {
         playtimeRef.current = nextPlaytime;
         setPlaytime(nextPlaytime);
         setDuelHistory(savedDuels ?? emptyDuelHistory());
-        const ids = new Set(bank.map((question) => question.id));
-        setProductivity(old=>sanitizeProductivity(old,ids));
+        const ids = new Set(available.map((question) => question.id));
+        setProductivity(old=>sanitizeProductivity(old,new Set([...ids,...old.queue,...Object.keys(old.errors)])));
         if (
           state.session &&
           state.session.questionIds.length &&
@@ -266,6 +278,24 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  const refreshLibrary = useCallback(async () => {
+    const snapshot = await loadQuestionLibrary();
+    setLibrary(snapshot);
+    setQuestions(mergeLibrary(builtinQuestions, snapshot));
+  }, [builtinQuestions]);
+  useEffect(() => {
+    if (!builtinQuestions.length) return;
+    let busy = false;
+    const timer = window.setInterval(async () => {
+      if (busy) return;
+      busy = true;
+      try { if (await scanQuestionPacks()) await refreshLibrary(); }
+      catch (reason) { setError(String(reason)); }
+      finally { busy = false; }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [builtinQuestions, refreshLibrary]);
 
   useEffect(() => {
     const active = () => {
@@ -455,7 +485,7 @@ export default function App() {
       const result = studySubmission(
         current,
         question,
-        questions,
+        builtinQuestions,
         stateRef.current.progress,
         studyRef.current,
         Date.now(),
@@ -581,6 +611,7 @@ export default function App() {
   }
   function home() {
     if (submitting.current) return;
+    setStudyOpen(null);
     const current = stateRef.current.session;
     if (current) {
       const next = chargeElapsed(current);
@@ -605,7 +636,7 @@ export default function App() {
     try {
       const result = studyCompletion(
         current,
-        questions,
+        builtinQuestions,
         stateRef.current.progress,
         studyRef.current,
         Date.now(),
@@ -710,7 +741,7 @@ export default function App() {
       launchPrepared(
         createAdaptiveSession(
           {
-            questions,
+            questions: builtinQuestions,
             progress: stateRef.current.progress,
             study: studyRef.current,
             now: Date.now(),
@@ -730,7 +761,7 @@ export default function App() {
       launchPrepared(
         sessionFromRecommendation(
           {
-            questions,
+            questions: builtinQuestions,
             progress: stateRef.current.progress,
             study: studyRef.current,
             now: Date.now(),
@@ -748,7 +779,7 @@ export default function App() {
     try {
       launchPrepared(
         generateModule(
-          questions,
+          builtinQuestions,
           section,
           stateRef.current.progress,
           studyRef.current,
@@ -768,7 +799,7 @@ export default function App() {
       learning = studyRef.current;
     if (!current?.module?.awaitingNext || !learning) return;
     if (current.mock) {
-      try { launchPrepared(generateMock(questions, stateRef.current.progress, learning, crypto.randomUUID(), Date.now(), current), true); }
+      try { launchPrepared(generateMock(builtinQuestions, stateRef.current.progress, learning, crypto.randomUUID(), Date.now(), current), true); }
       catch (e) { setError(String(e)); }
       return;
     }
@@ -777,7 +808,7 @@ export default function App() {
     try {
       launchPrepared(
         generateModule(
-          questions,
+          builtinQuestions,
           current.test,
           stateRef.current.progress,
           learning,
@@ -808,6 +839,7 @@ export default function App() {
     begin(
       [question],
       {
+        sourceIds: [],
         domains: [],
         skills: [],
         difficulties: [],
@@ -838,7 +870,7 @@ export default function App() {
         delete learning.evidence[id];
         delete learning.reviews[id];
         learning.skills = calculateMastery(
-          questions,
+          builtinQuestions,
           next,
           learning.evidence,
           Date.now(),
@@ -892,7 +924,7 @@ export default function App() {
                 <p className="lead">
                   Focused practice. Real questions. Your own pace.
                 </p>
-                {study && <><LevelSummary study={study} /><ProgressionSummary study={study} questions={questions} progress={progress} playtime={playtime} onOpen={()=>setView("campaign")}/></>}
+                {study && <><LevelSummary study={study} /><ProgressionSummary study={study} questions={builtinQuestions} progress={progress} playtime={playtime} onOpen={()=>setView("campaign")}/></>}
                 {session &&
                   (!session.finished || session.module?.awaitingNext) && (
                     <section className="resume">
@@ -961,7 +993,7 @@ export default function App() {
                 <div className="study-modes">
                   <button onClick={() => {
                     if (!studyRef.current) return;
-                    try { launchPrepared(generateMock(questions, stateRef.current.progress, studyRef.current, crypto.randomUUID(), Date.now())); }
+                    try { launchPrepared(generateMock(builtinQuestions, stateRef.current.progress, studyRef.current, crypto.randomUUID(), Date.now())); }
                     catch (e) { setError(String(e)); }
                   }}><span><strong>Full SAT Mock</strong><small>Four timed modules · estimated score range.</small></span></button>
                   <button onClick={() => setView('ladder')}><span><strong>Challenge Ladder</strong><small>Fourteen progressive practice challenges.</small></span></button>
@@ -985,10 +1017,11 @@ export default function App() {
                     </span>
                   </button>
                   <button onClick={() => setView("productivity")}><span><strong>Question Finder & Study Tools</strong><small>Find IDs, build sets, browse, queue, and review errors.</small></span></button>
+                  <button onClick={() => setView("library")}><span><strong>Question Library & Sources</strong><small>Manage packs, import questions, and write your own.</small></span></button>
                 </div>
                 {study && (
                   <RecommendationList
-                    questions={questions}
+                    questions={builtinQuestions}
                     progress={progress}
                     study={study}
                     onStart={startRecommendation}
@@ -1069,8 +1102,9 @@ export default function App() {
             />
           )}
           {view === "productivity" && (
-            <ProductivityPanel questions={questions} progress={progress} study={study} state={productivity} onChange={setProductivity} onPractice={startQuestionIds} onBack={home}/>
+            <ProductivityPanel questions={questions} progress={progress} study={study} state={productivity} initialQuestion={studyOpen} onChange={setProductivity} onPractice={startQuestionIds} onBack={() => { setStudyOpen(null); home(); }}/>
           )}
+          {view === "library" && <LibraryManager questions={questions} sources={[{id:"builtin",name:"Built-in SAT Bank",sourceType:"builtin",version:"1",enabled:true,present:true,count:builtinQuestions.length,status:"Ready",report:{}},...library.sources]} onRefresh={refreshLibrary} onView={q=>{setStudyOpen(q);setView("productivity");}} onBack={home}/>}
           {view === "progress" && (
             <Progress
               questions={questions}
@@ -1081,7 +1115,7 @@ export default function App() {
               studyPanel={
                 study ? (
                   <StudyOverview
-                    questions={questions}
+                    questions={builtinQuestions}
                     progress={progress}
                     study={study}
                     playtime={playtime}
@@ -1106,9 +1140,9 @@ export default function App() {
             />
             </>
           )}
-          {view === "campaign" && study && <CampaignPanel study={study} onBack={home} onStart={id=>{try{launchPrepared(generateCampaign(questions,stateRef.current.progress,studyRef.current!,id,crypto.randomUUID(),Date.now()));}catch(e){setError(String(e));}}}/>}
+          {view === "campaign" && study && <CampaignPanel study={study} onBack={home} onStart={id=>{try{launchPrepared(generateCampaign(builtinQuestions,stateRef.current.progress,studyRef.current!,id,crypto.randomUUID(),Date.now()));}catch(e){setError(String(e));}}}/>}
           {view === 'ladder' && study && <ChallengeLadder study={study} onBack={home} onStart={level => {
-            try { launchPrepared(generateChallenge(questions, stateRef.current.progress, studyRef.current!, level, crypto.randomUUID(), Date.now())); }
+            try { launchPrepared(generateChallenge(builtinQuestions, stateRef.current.progress, studyRef.current!, level, crypto.randomUUID(), Date.now())); }
             catch (e) { setError(String(e)); }
           }} />}
           {view === "adaptive-setup" && (
@@ -1120,7 +1154,7 @@ export default function App() {
           {view === "achievements" && study && (
             <Achievements
               study={study}
-              questions={questions}
+              questions={builtinQuestions}
               progress={progress}
               onBack={home}
             />
@@ -1133,7 +1167,7 @@ export default function App() {
             />
           )}
           {view === "duel-setup" && (
-            <DuelSetup questions={questions} history={duelHistory} onBack={home} onStart={(match) => { setDuel(match); setView("duel"); }} />
+            <DuelSetup questions={builtinQuestions} history={duelHistory} onBack={home} onStart={(match) => { setDuel(match); setView("duel"); }} />
           )}
           {view === "duel" && duel && (
             <Duel questions={questions} match={duel} onChange={setDuel} onFinish={finishDuel} onBack={() => { setDuel(null); home(); }} onFeedback={(correct) => sfx.play(correct ? "correct" : "incorrect")} />
@@ -1215,9 +1249,9 @@ export default function App() {
           <h3>Local storage</h3>
           <p className="storage-path">{location}</p>
           <p>
-            Your question bank is bundled with the app. Attempts, notes,
-            highlights, review flags, and the current session are saved
-            separately.
+            The built-in bank is bundled with the app. External packs and
+            personal questions live in the local Question Library. Attempts,
+            notes, highlights, review flags, and sessions are saved separately.
           </p>
           <h3>Keyboard shortcuts</h3>
           <p>

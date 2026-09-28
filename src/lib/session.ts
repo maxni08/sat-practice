@@ -1,5 +1,6 @@
 import { answerMatches, isValidAnswer } from "./answers";
 import { emptyProgress } from "../types";
+import { sourceId } from "../library/library";
 import type {
   ProgressMap,
   Question,
@@ -16,6 +17,7 @@ export function filterQuestions(
 ): Question[] {
   return questions.filter((question) => {
     if (question.test !== filters.test) return false;
+    if (filters.sourceIds?.length && !filters.sourceIds.includes(sourceId(question))) return false;
     if (filters.domains.length && !filters.domains.includes(question.domain))
       return false;
     if (filters.skills.length && !filters.skills.includes(question.skill))

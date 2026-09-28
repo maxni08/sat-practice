@@ -7,7 +7,7 @@ From the repository directory in Windows PowerShell:
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r .\scripts\requirements.txt
-.\.venv\Scripts\python.exe .\scripts\import_bank.py --source-dir "C:\Users\sansp\Desktop\SAT"
+.\.venv\Scripts\python.exe .\scripts\import_bank.py --source-dir ".\path\to\your\SAT\PDFs"
 .\.venv\Scripts\python.exe .\scripts\import_bank.py --validate-only
 .\.venv\Scripts\python.exe .\scripts\verify_assets.py
 .\.venv\Scripts\python.exe -m unittest discover -s .\scripts -p "test_*.py" -v

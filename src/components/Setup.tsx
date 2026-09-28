@@ -7,7 +7,9 @@ import type {
   Session,
 } from "../types";
 import { filterQuestions } from "../lib/session";
+import { sourceId, sourceName } from "../library/library";
 export type SetupFilters = {
+  sourceIds: string[];
   domains: string[];
   skills: string[];
   difficulties: string[];
@@ -33,6 +35,7 @@ export function Setup({
   onBack: () => void;
 }) {
   const [f, setF] = useState<SetupFilters>({
+    sourceIds: [],
     domains: [],
     skills: [],
     difficulties: [],
@@ -47,6 +50,7 @@ export function Setup({
     [questions, test],
   );
   const domains = [...new Set(bank.map((q) => q.domain))].sort();
+  const sources = [...new Map(bank.map(q => [sourceId(q), sourceName(q)])).entries()];
   const skills = [
     ...new Set(
       bank
@@ -58,6 +62,7 @@ export function Setup({
     bank,
     {
       test,
+      sourceIds: f.sourceIds,
       domains: f.domains,
       skills: f.skills,
       difficulties: f.difficulties as Difficulty[],
@@ -86,6 +91,12 @@ export function Setup({
       </p>
       <div className="setup-grid">
         <div>
+          <fieldset>
+            <legend>Question sources</legend>
+            <label className="check"><input type="radio" name="setup-source" checked={!f.sourceIds.length} onChange={() => setF({ ...f, sourceIds: [] })} /> All enabled sources</label>
+            <label className="check"><input type="radio" name="setup-source" checked={f.sourceIds.length === 1 && f.sourceIds[0] === "builtin"} onChange={() => setF({ ...f, sourceIds: ["builtin"] })} /> Built-in only</label>
+            <div className="checkbox-list">{sources.filter(([id]) => id !== "builtin").map(([id, name]) => <label key={id}><input type="checkbox" checked={f.sourceIds.includes(id)} onChange={() => setF(old => ({ ...old, sourceIds: old.sourceIds.includes(id) ? old.sourceIds.filter(value => value !== id) : [...old.sourceIds.filter(value => value !== "builtin"), id] }))} />{name}</label>)}</div>
+          </fieldset>
           <fieldset>
             <legend>Question history</legend>
             <select

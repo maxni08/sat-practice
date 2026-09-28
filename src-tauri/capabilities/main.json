@@ -3,5 +3,5 @@
   "identifier": "main",
   "description": "Only the local practice window can access application commands. Desmos has no native permissions.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:allow-open"]
 }

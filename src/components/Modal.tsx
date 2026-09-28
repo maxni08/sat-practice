@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { useEscape } from "../lib/escape";
 export function Modal({
   title,
   onClose,
@@ -12,6 +13,7 @@ export function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  useEscape(true, onClose, 30);
   useEffect(() => {
     const d = ref.current;
     const before = document.activeElement as HTMLElement;

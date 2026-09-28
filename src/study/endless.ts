@@ -16,7 +16,8 @@ function pick(
     (Date.parse(progress[a.id]?.lastAttemptDate ?? "") || 0) - (Date.parse(progress[b.id]?.lastAttemptDate ?? "") || 0),
   );
   const shuffled = shuffleQuestions(pool, random);
-  const math = used.filter(id => bank.find(q => q.id === id)?.test === "Math").length;
+  const mathIds = new Set(bank.filter(q => q.test === "Math").map(q => q.id));
+  const math = used.filter(id => mathIds.has(id)).length;
   const rw = used.length - math;
   const preferred = math > rw ? "Reading and Writing" : rw > math ? "Math" : undefined;
   return preferred ? shuffled.find(q => q.test === preferred) ?? shuffled[0] : shuffled[0];

@@ -1,13 +1,84 @@
 mod storage;
+mod library;
 
 use serde_json::Value;
 use std::{path::PathBuf, sync::Mutex};
 use storage::{Progress, SavedState, Store};
+use library::{ImportReport, Library, LibrarySnapshot};
 use tauri::{Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 struct AppState {
     store: Mutex<Store>,
+    library: Mutex<Library>,
     path: PathBuf,
+}
+
+#[tauri::command]
+fn load_question_library(window: WebviewWindow, state: State<'_, AppState>) -> Result<LibrarySnapshot, String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.snapshot()
+}
+
+#[tauri::command]
+fn scan_question_packs(window: WebviewWindow, state: State<'_, AppState>) -> Result<bool, String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.scan()
+}
+
+#[tauri::command]
+fn import_question_file(window: WebviewWindow, state: State<'_, AppState>, path: String) -> Result<ImportReport, String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.import_path(std::path::Path::new(&path))
+}
+
+#[tauri::command]
+fn set_question_source(window: WebviewWindow, state: State<'_, AppState>, source_id: String, enabled: bool) -> Result<(), String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.set_enabled(&source_id, enabled)
+}
+
+#[tauri::command]
+fn remove_question_source(window: WebviewWindow, state: State<'_, AppState>, source_id: String) -> Result<(), String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.remove_source(&source_id)
+}
+
+#[tauri::command]
+fn save_personal_question(window: WebviewWindow, state: State<'_, AppState>, question: Value, prior_id: Option<String>) -> Result<Value, String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.save_personal(question, prior_id.as_deref())
+}
+
+#[tauri::command]
+fn deactivate_personal_question(window: WebviewWindow, state: State<'_, AppState>, question_id: String) -> Result<(), String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.deactivate_personal(&question_id)
+}
+
+#[tauri::command]
+fn save_personal_image(window: WebviewWindow, state: State<'_, AppState>, data_url: String) -> Result<String, String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.save_personal_asset(&data_url)
+}
+
+#[tauri::command]
+fn read_question_asset(window: WebviewWindow, state: State<'_, AppState>, uri: String) -> Result<String, String> {
+    require_main(&window)?;
+    state.library.lock().map_err(|_| "Question library is busy")?.read_asset(&uri)
+}
+
+#[tauri::command]
+fn open_question_packs_folder(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {
+    require_main(&window)?;
+    let path = state.library.lock().map_err(|_| "Question library is busy")?.packs_path();
+    #[cfg(target_os = "windows")]
+    let mut command = std::process::Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut command = std::process::Command::new("open");
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let mut command = std::process::Command::new("xdg-open");
+    command.arg(path).spawn().map_err(|e| format!("Could not open Question Packs folder: {e}"))?;
+    Ok(())
 }
 
 // Defense in depth: custom commands can only be called from the local main webview.
@@ -191,11 +262,29 @@ pub fn run() {
                 let _ = main.set_focus();
             }
         }))
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let path = app.path().app_data_dir()?.join("progress.sqlite3");
+            // Native release smoke tests may use an isolated temporary profile.
+            // Normal launches always retain the platform app-data location.
+            let directory = match std::env::var_os("SAT_PRACTICE_TEST_DATA_DIR") {
+                Some(raw) => {
+                    let candidate = std::path::PathBuf::from(raw);
+                    std::fs::create_dir_all(&candidate)?;
+                    let candidate = candidate.canonicalize()?;
+                    if !candidate.starts_with(std::env::temp_dir().canonicalize()?) {
+                        return Err(std::io::Error::other("Test data directory must be inside the system temp folder").into());
+                    }
+                    candidate
+                }
+                None => app.path().app_data_dir()?,
+            };
+            let path = directory.join("progress.sqlite3");
             let store = Store::open(&path).map_err(std::io::Error::other)?;
+            let mut library = Library::open(&path, path.parent().ok_or("Application data path is missing")?).map_err(std::io::Error::other)?;
+            library.scan().map_err(std::io::Error::other)?;
             app.manage(AppState {
                 store: Mutex::new(store),
+                library: Mutex::new(library),
                 path,
             });
             if let Some(main) = app.get_webview_window("main") {
@@ -225,7 +314,9 @@ pub fn run() {
             reset_question,
             data_location,
             open_calculator
-            ,load_study,commit_study,load_playtime,save_playtime,load_duel_history,save_duel_history
+            ,load_study,commit_study,load_playtime,save_playtime,load_duel_history,save_duel_history,
+            load_question_library,scan_question_packs,import_question_file,set_question_source,remove_question_source,
+            save_personal_question,deactivate_personal_question,save_personal_image,read_question_asset,open_question_packs_folder
         ])
         .run(tauri::generate_context!())
         .expect(
