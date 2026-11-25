@@ -1,0 +1,22 @@
+import { test,expect } from "@playwright/test";
+test("Bluebook accepts R&W-only results, editing removes placeholders, and focus follows the tested section",async({page})=>{
+ await page.goto("/");
+ await expect(page.getByRole("heading",{name:"Make every question count."})).toBeVisible();
+ await page.getByText("Bluebook score log",{exact:false}).click();
+ await page.getByLabel("Date",{exact:true}).fill("2026-11-20");
+ await page.getByLabel("Test number").fill("8");
+ await page.getByLabel("R&W",{exact:true}).fill("700");
+ await page.getByRole("button",{name:"Save Bluebook result"}).click();
+ await expect(page.getByText("2026-11-20 · Test 8 · Section practice",{exact:false})).toBeVisible();
+ await expect(page.getByText("Focus: Reading and Writing",{exact:false})).toBeVisible();
+ await page.getByRole("button",{name:"Edit",exact:true}).click();
+ await page.getByLabel("Math",{exact:true}).fill("200");
+ await page.getByRole("button",{name:"Save Bluebook result"}).click();
+ await page.getByRole("button",{name:"Edit",exact:true}).click();
+ await page.getByLabel("Math",{exact:true}).fill("");
+ await page.getByRole("button",{name:"Save Bluebook result"}).click();
+ await page.reload();
+ await expect(page.getByText("Focus: Reading and Writing",{exact:false})).toBeVisible();
+ await page.getByText("Bluebook score log",{exact:false}).click();
+ await expect(page.getByText("2026-11-20 · Test 8 · Section practice",{exact:false})).toBeVisible();
+});

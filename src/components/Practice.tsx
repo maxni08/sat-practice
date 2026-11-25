@@ -1,3 +1,4 @@
+import { remainingTimerSeconds, pauseSession, resumeSession } from "../lib/session";
 import { STAGES } from "../progression/campaign";
 import { useEffect, useState } from "react";
 import { useEscape } from "../lib/escape";
@@ -62,8 +63,8 @@ export function Practice({
   const [panel, setPanel] = useState<
     "notes" | "navigator" | "reference" | "finish" | "reset" | null
   >(null);
-  useEscape(panel !== null, () => setPanel(null), 20);
   const [highlight, setHighlight] = useState(false);
+  useEscape(panel !== null || highlight, () => { setPanel(null); setHighlight(false); }, 20);
   const [original, setOriginal] = useState(false);
   const [originalRationale, setOriginalRationale] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -103,7 +104,7 @@ export function Practice({
   }, []);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (saving || e.ctrlKey || e.altKey || e.metaKey || panel || e.repeat)
+      if (s.pausedAt != null || saving || e.ctrlKey || e.altKey || e.metaKey || panel || e.repeat)
         return;
       const target = e.target as HTMLElement;
       if (target.closest('input,textarea,select,[contenteditable="true"]'))
@@ -145,21 +146,19 @@ export function Practice({
         .requiresOriginalFormat,
     );
     setOriginalRationale(false);
+    setHighlight(false);
   }, [q.id]);
-  const remain =
-    s.timerMode === "session"
-      ? Math.max(0, Math.ceil(((s.deadline ?? now) - now) / 1000))
-      : Math.max(0, Math.ceil(s.timerSeconds - (s.elapsed[q.id] ?? 0)));
+  const remain = remainingTimerSeconds(s, q.id, now) ?? 0;
   const clock = `${Math.floor(remain / 60)}:${String(remain % 60).padStart(2, "0")}`;
   const isRW = q.test === "Reading and Writing";
   const addHighlight = (h: QuestionProgress["highlights"][number]) =>
-    onProgress(q.id, (old) => ({ ...old, highlights: [...old.highlights, h] }));
+    onChange(old => ({...old, highlights: {...old.highlights, [q.id]: [...(old.highlights?.[q.id] ?? []), h]}}));
   const renderText = (text: string, field: "passage" | "stem") => (
     <HighlightText
       key={`${q.id}-${field}`}
       text={text}
       field={field}
-      highlights={p?.highlights ?? []}
+      highlights={s.highlights?.[q.id] ?? []}
       onHighlight={addHighlight}
       enabled={highlight}
       underlines={field === "passage" ? q.passageUnderlines : []}
@@ -188,11 +187,11 @@ export function Practice({
           className={`timer ${remain === 0 && s.timerMode !== "none" ? "expired" : ""}`}
           aria-live="off"
         >
-          {s.timerMode === "none" ? (
+          {s.finished ? <span className="muted">Review · untimed</span> : s.timerMode === "none" ? (
             <span className="muted">Untimed</span>
           ) : (
             <>
-              <strong>{s.timerHidden ? "Timer running" : clock}</strong>
+              <strong>{s.pausedAt != null ? "Paused" : s.timerHidden ? "Timer running" : clock}</strong>
               <button
                 onClick={() =>
                   onChange((old) => ({ ...old, timerHidden: !old.timerHidden }))
@@ -223,6 +222,10 @@ export function Practice({
               </button>
             </>
           )}
+          {!s.finished && <button onClick={()=>{setHighlight(false); onChange(old=>pauseSession(old));}}>Pause</button>}
+          <button aria-pressed={highlight} onClick={()=>{setHighlight(!highlight);setPanel(null);}}>
+            <Highlighter size={19}/><span>{highlight ? "Stop highlighting" : "Highlight"}</span>
+          </button>
           <button onClick={() => setPanel(panel === "notes" ? null : "notes")}>
             <Highlighter size={19} />
             <span>Highlights & Notes</span>
@@ -509,7 +512,7 @@ export function Practice({
                     : "Show original explanation"}
                 </button>
               )}
-              {!submitted.correct && onErrorTags && <div className="tag-row" aria-label="Error tags">{["Concept","Careless","Misread","Timing","Vocabulary","Guess"].map(tag=><button key={tag} aria-pressed={errorTags.includes(tag)} className={errorTags.includes(tag)?"selected":""} onClick={()=>onErrorTags(errorTags.includes(tag)?errorTags.filter(value=>value!==tag):[...errorTags,tag])}>{tag}</button>)}</div>}
+              {onErrorTags && <div className="tag-row" aria-label="Error tags">{(submitted.correct ? ["Uncertain correct","Too slow"] : ["Concept","Careless","Misread","Timing","Vocabulary","Guess","Too slow"]).map(tag=><button key={tag} aria-pressed={errorTags.includes(tag)} className={errorTags.includes(tag)?"selected":""} onClick={()=>onErrorTags(errorTags.includes(tag)?errorTags.filter(value=>value!==tag):[...errorTags,tag])}>{tag}</button>)}</div>}
               <div className="button-row">{onQueue&&<button onClick={onQueue}>Add to Study Queue</button>}{onSimilar&&<button onClick={onSimilar}>Practice similar questions</button>}</div>
               <button className="text-button" onClick={() => setPanel("reset")}>
                 Reset progress for this question
@@ -578,6 +581,7 @@ export function Practice({
           </button>
         </Modal>
       )}
+      {s.pausedAt != null && !s.finished && <Modal title="Session paused" onClose={()=>onChange(old=>resumeSession(old))}><p>Your timer and study time are paused.</p><button className="primary" onClick={()=>onChange(old=>resumeSession(old))}>Resume</button></Modal>}
       {panel === "notes" && (
         <Modal title="Highlights & Notes" onClose={() => setPanel(null)}>
           <div className="notes-tools">
@@ -593,7 +597,7 @@ export function Practice({
             </button>
             <button
               onClick={() =>
-                onProgress(q.id, (old) => ({ ...old, highlights: [] }))
+                onChange(old => ({...old, highlights:{...old.highlights,[q.id]:[]}}))
               }
             >
               Clear highlights
@@ -601,7 +605,7 @@ export function Practice({
           </div>
           <p className="muted">
             Turn highlighting on, then select passage or question text.
-            Highlights are yellow and saved with this question.
+            Highlights are saved within this session. New attempts start without earlier highlights.
           </p>
           <label className="field-label">
             <span>

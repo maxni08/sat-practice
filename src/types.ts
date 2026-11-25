@@ -91,9 +91,12 @@ export interface SessionAnswer {
 }
 
 export interface Session {
+  pausedAt?: number | null;
+  highlights?: Record<string, Highlight[]>;
+  verificationFor?: string;
   campaign?: { stage: string; stars?: number };
   ghost?: { correct: number; total: number; seconds: number };
-  mock?: { id: string; stage: number; moduleIds: string[]; complete?: boolean };
+  mock?: { id: string; stage: number; moduleIds: string[]; usedQuestionIds?: string[]; complete?: boolean };
   challenge?: { level: number; passed?: boolean };
   id: string;
   test: TestSection;

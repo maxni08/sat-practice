@@ -240,14 +240,14 @@ test('per-question timers retain independent elapsed time and submitted answers 
   await expect(page.getByRole('button', { name: 'Submit Answer', exact: true })).toBeVisible();
 });
 
-test('session timer continues on the home screen and after an interrupted-session reload', async ({ page }) => {
+test('session timer pauses on the home screen and resumes after reload', async ({ page }) => {
   await page.clock.install();
   await seedSession(page, [reading], 'session');
   await page.getByRole('button', { name: 'Save and return home' }).click();
   await page.clock.fastForward(100_000);
   await page.reload();
   await page.getByRole('button', { name: 'Resume' }).click();
-  await expect(page.locator('.timer strong')).toHaveText('0:00');
+  await expect(page.locator('.timer strong')).not.toHaveText('0:00');
   expect((await savedState(page)).session?.answers).toEqual({});
 });
 

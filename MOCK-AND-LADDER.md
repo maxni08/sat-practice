@@ -4,8 +4,8 @@ The mock reuses the existing four official-length modules: Reading & Writing
 27 questions / 32 minutes twice, then Math 22 questions / 35 minutes twice.
 Existing Module 2 routing (70% threshold) and balanced domain/skill/type generation
 are unchanged. This is a practice approximation, not College Board's proprietary
-routing. The optional two-minute break between subjects is shortened for practice.
-Each completed module is saved in Module History. The final combined result and
+routing. The break between subjects is 10 minutes and can be skipped for practice.
+Each completed module is saved in Module History. Mock selection hard-excludes question IDs from previous mock modules and carries a cumulative used-question ledger in the active session across restarts. Identical text questions with reordered choices are deduplicated; visual questions include their asset references in the identity. If unused questions cannot meet the blueprint, generation fails with a clear message instead of silently recycling them. This does not prevent similar concepts or distinct numerical variants from appearing. The final combined result and
 interrupted mock are saved in the existing resumable session. Starting another
 session replaces that resumable summary; individual module history remains.
 

@@ -166,11 +166,20 @@ export function remainingTimerSeconds(
   questionId: string,
   now = Date.now(),
 ): number | null {
-  if (session.timerMode === "none") return null;
+  if (session.finished || session.timerMode === "none") return null;
+  now = session.pausedAt ?? now;
   if (session.timerMode === "session")
     return Math.max(0, Math.ceil(((session.deadline ?? now) - now) / 1000));
   return Math.max(
     0,
     Math.ceil(session.timerSeconds - (session.elapsed[questionId] ?? 0)),
   );
+}
+
+export function pauseSession(session: Session, now = Date.now()): Session {
+  return session.finished || session.pausedAt != null ? session : {...session, pausedAt: now};
+}
+export function resumeSession(session: Session, now = Date.now()): Session {
+  if (session.pausedAt == null) return session;
+  return {...session, pausedAt: null, deadline: session.deadline == null ? null : session.deadline + Math.max(0, now-session.pausedAt)};
 }

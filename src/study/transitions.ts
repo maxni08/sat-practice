@@ -166,7 +166,7 @@ export function studyCompletion(
     nextStudy = completeChallenge(nextStudy, session, questions, now);
     session = { ...session, challenge: { ...session.challenge, passed: nextStudy.ladder!.history.find(a => a.id === session.id)!.passed } };
   }
-  session = completeMock(session, nextStudy);
+  session = completeMock(session, nextStudy, questions);
   nextStudy = completeCampaign(nextStudy, session, questions, now);
   if(session.campaign) session={...session,campaign:{...session.campaign,stars:nextStudy.progression?.runs.find(r=>r.id===session.id)?.stars??0}};
   nextStudy = progressionCompletion(nextStudy,session,questions,nextProgress,now);

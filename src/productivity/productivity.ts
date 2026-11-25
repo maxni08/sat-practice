@@ -1,8 +1,8 @@
 import type { ProgressMap, Question, Session, TestSection, Difficulty } from "../types";
 
-export const ERROR_TAGS = ["Concept", "Careless", "Misread", "Timing", "Vocabulary", "Guess"] as const;
+export const ERROR_TAGS = ["Concept", "Careless", "Misread", "Timing", "Vocabulary", "Guess", "Uncertain correct", "Too slow"] as const;
 export type ErrorTag = (typeof ERROR_TAGS)[number];
-export interface TaggedError { tags: ErrorTag[]; updatedAt: string }
+export interface TaggedError { tags: ErrorTag[]; updatedAt: string; retriedAt?: string; verifiedAt?: string }
 export interface ProductivityState {
   version: 1;
   queue: string[];
@@ -23,7 +23,9 @@ export function sanitizeProductivity(raw: unknown, validIds?: Set<string>): Prod
   if (value.errors && typeof value.errors === "object") for (const [id, entry] of Object.entries(value.errors)) {
     if (validIds && !validIds.has(id)) continue;
     const tags = Array.isArray(entry?.tags) ? [...new Set(entry.tags.filter((tag): tag is ErrorTag => ERROR_TAGS.includes(tag as ErrorTag)))] : [];
-    if (tags.length) errors[id] = { tags, updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : new Date(0).toISOString() };
+    const retriedAt = typeof entry?.retriedAt === "string" ? entry.retriedAt : undefined;
+    const verifiedAt = typeof entry?.verifiedAt === "string" ? entry.verifiedAt : undefined;
+    if (tags.length || retriedAt || verifiedAt) errors[id] = { tags, retriedAt, verifiedAt, updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : new Date(0).toISOString() };
   }
   return { version: 1, queue, errors };
 }

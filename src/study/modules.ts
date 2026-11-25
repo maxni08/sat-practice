@@ -13,6 +13,7 @@ import {
   MODULE_BLUEPRINT,
   RULES,
 } from "./config";
+import { orderModuleQuestions, validateModuleStructure } from "./ordering";
 import type { BreakdownRow, ModuleRecord, StudyState } from "./types";
 
 export function seededRandom(seed: string): () => number {
@@ -184,12 +185,10 @@ export function generateModule(
         "The bank cannot satisfy the module numeric-response quota.",
       );
   }
-  for (let i = selected.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [selected[i], selected[j]] = [selected[j], selected[i]];
-  }
+  const ordered = orderModuleQuestions(selected, test);
+  validateModuleStructure(ordered, test);
   const session = createSession(
-    selected,
+    ordered,
     {
       test,
       domains: [],

@@ -75,6 +75,8 @@ import {
 } from "./lib/sfx";
 import { Duel, DuelSetup } from "./duel/DuelView";
 import { emptyDuelHistory, recordDuel, type DuelHistory, type DuelMatch } from "./duel/duel";
+import { pauseSession, resumeSession } from "./lib/session";
+import { StudyToday, ModuleNextSteps } from "./productivity/StudyPlan";
 import { ProductivityPanel } from "./productivity/ProductivityPanel";
 import { loadProductivity, saveProductivity, sanitizeProductivity, similarQuestions, type ErrorTag, type ProductivityState } from "./productivity/productivity";
 import { loadQuestionLibrary, scanQuestionPacks, mergeLibrary, type LibrarySnapshot } from "./library/library";
@@ -319,7 +321,7 @@ export default function App() {
       playtimeTickRef.current = now;
       const current = stateRef.current.session;
       const mode = playtimeMode(viewRef.current, current);
-      if (mode && playtimeRef.current) {
+      if (mode && playtimeRef.current && current?.pausedAt == null) {
         let timedUntil: number | null = null;
         if (viewRef.current === "practice" && current && !current.finished) {
           if (current.timerMode === "session") timedUntil = current.deadline;
@@ -383,6 +385,7 @@ export default function App() {
     if (
       !practicingRef.current ||
       current.finished ||
+      current.pausedAt != null ||
       current.answers[id] ||
       submitting.current ||
       seconds === 0
@@ -404,6 +407,7 @@ export default function App() {
       if (!old) return;
       if (
         old.mode === "module" &&
+        old.pausedAt == null &&
         !old.finished &&
         old.deadline &&
         Date.now() >= old.deadline
@@ -482,6 +486,7 @@ export default function App() {
     submitting.current = true;
     setSaving(true);
     try {
+      const prior = stateRef.current.progress[question.id];
       const result = studySubmission(
         current,
         question,
@@ -506,6 +511,15 @@ export default function App() {
         progress: result.progress,
       };
       acceptStudy(result.study);
+      const answer = result.session.answers[question.id];
+      if (answer.correct) setProductivity(old => {
+        const origin = current.verificationFor;
+        const verify = !!origin && !prior?.attempts && question.id !== origin;
+        const id = verify ? origin : question.id;
+        const entry = old.errors[id];
+        if (!verify && !entry?.tags.length && !prior?.incorrectAttempts) return old;
+        return {...old, errors:{...old.errors,[id]:{tags:entry?.tags ?? [],updatedAt:entry?.updatedAt ?? answer.submittedAt,...(verify ? {verifiedAt:answer.submittedAt} : {retriedAt:answer.submittedAt})}}};
+      });
       sfx.play(
         result.session.answers[question.id].correct ? "correct" : "incorrect",
       );
@@ -578,11 +592,12 @@ export default function App() {
     setHistory(filter);
     setView("setup");
   }
-  function startQuestionIds(ids: string[]) {
+  function startQuestionIds(ids: string[], verificationFor?: string) {
     const bank=ids.map(id=>questions.find(q=>q.id===id)).filter(Boolean) as Question[];
     if(!bank.length){setError("No valid questions were selected.");return;}
     const next=createSession([bank[0]],{test:bank[0].test,domains:[],skills:[],difficulties:[],history:"all",count:1,randomize:false,timerMode:"none",timerSeconds:0},stateRef.current.progress);
     next.questionIds=bank.map(q=>q.id);
+    next.verificationFor=verificationFor;
     launchPrepared(next);
   }
   function startEndless() {
@@ -601,7 +616,7 @@ export default function App() {
     } catch (reason) { setError(String(reason)); }
   }
   function setErrorTags(id:string,tags:string[]){
-    setProductivity(old=>{const errors={...old.errors};if(tags.length)errors[id]={tags:tags as ErrorTag[],updatedAt:new Date().toISOString()};else delete errors[id];return{...old,errors}});
+    setProductivity(old=>{const errors={...old.errors};if(tags.length || errors[id]?.verifiedAt || errors[id]?.retriedAt)errors[id]={...errors[id],tags:tags as ErrorTag[],updatedAt:new Date().toISOString()};else delete errors[id];return{...old,errors}});
   }
   function finishDuel(match: DuelMatch) {
     const next = recordDuel(duelHistory, match, Date.now());
@@ -614,7 +629,7 @@ export default function App() {
     setStudyOpen(null);
     const current = stateRef.current.session;
     if (current) {
-      const next = chargeElapsed(current);
+      const next = pauseSession(chargeElapsed(current));
       stateRef.current.session = next;
       setSession(next);
       void enqueue(() => saveSession(next));
@@ -696,6 +711,7 @@ export default function App() {
         !loading &&
         current?.mode === "module" &&
         !current.finished &&
+        current.pausedAt == null &&
         current.deadline &&
         Date.now() >= current.deadline &&
         !submitting.current &&
@@ -908,7 +924,7 @@ export default function App() {
           <h1>Opening your question bank…</h1>
         </div>
       ) : (
-        <>
+        <div className="screen-transition" key={view}>
           {view === "home" && (
             <>
               <header className="home-header">
@@ -924,6 +940,7 @@ export default function App() {
                 <p className="lead">
                   Focused practice. Real questions. Your own pace.
                 </p>
+                <StudyToday questions={questions} progress={progress} study={study} onPractice={startQuestionIds} onModule={section=>startModule(section,false)} />
                 {study && <><LevelSummary study={study} /><ProgressionSummary study={study} questions={builtinQuestions} progress={progress} playtime={playtime} onOpen={()=>setView("campaign")}/></>}
                 {session &&
                   (!session.finished || session.module?.awaitingNext) && (
@@ -942,13 +959,16 @@ export default function App() {
                       </div>
                       <button
                         className="primary"
-                        onClick={() =>
+                        onClick={() => {
+                          const next = resumeSession(stateRef.current.session!);
+                          stateRef.current.session = next; setSession(next); clockRef.current = Date.now();
+                          void enqueue(() => saveSession(next));
                           setView(
                             session.module?.awaitingNext
                               ? "transition"
                               : "practice",
-                          )
-                        }
+                          );
+                        }}
                       >
                         {session.module?.awaitingNext
                           ? "Continue section"
@@ -1130,6 +1150,7 @@ export default function App() {
           )}
           {view === "results" && session && (
             <>
+            <ModuleNextSteps session={session} questions={questions} progress={progress} onPractice={startQuestionIds} />
             <CampaignResults session={session}/><ExtraResults session={session} questions={questions} />
             <Results
               questions={questions}
@@ -1180,7 +1201,7 @@ export default function App() {
               onHome={home}
             />
           )}
-        </>
+        </div>
       )}
       {progressionNotice && <aside className="progression-toast" role="status"><button aria-label="Dismiss progression notification" onClick={()=>setProgressionNotice(null)}>×</button><strong>{progressionNotice.title}</strong><p>{progressionNotice.detail}</p></aside>}
       {error && (
